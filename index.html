@@ -103,8 +103,10 @@ function spawn(){
 
 function start(){ac();SFX.click();reset();musicT=0;mi=0;state='play';ov.style.display='none'}
 function end(){
-  state='over';SFX.crash();wallet+=coins;save();
-  if(score>best){best=score;try{localStorage.setItem('ci-best',best)}catch(e){}}
+  state='over';SFX.crash();
+  wallet+=coins;
+  if(score>best)best=score;
+  salvarDados();
   document.getElementById('t').textContent='Fim de jogo';
   var dd=document.getElementById('d');dd.style.display='block';dd.innerHTML='<b>Pontos</b> '+score+'<br><b>Moedas</b> '+coins+'<br><b>Tempo sem moedas</b> '+noCoin.toFixed(1)+' s<br><b>Recorde</b> '+best;
   document.getElementById('go').textContent='Jogar de novo';refreshMenu();
@@ -164,6 +166,20 @@ var SK=[
 var wallet=0,owned=[0],skin=0,CAR=['#e63946','#f4a300','#3a82f0','#2fbf71','#9b5de5'];
 try{wallet=+localStorage.getItem('ci-w')||0;owned=JSON.parse(localStorage.getItem('ci-o')||'[0]');skin=+localStorage.getItem('ci-s')||0}catch(e){}
 function save(){try{localStorage.setItem('ci-w',wallet);localStorage.setItem('ci-o',JSON.stringify(owned));localStorage.setItem('ci-s',skin)}catch(e){}}
+// ===== SALVAMENTO: moedas e recorde =====
+function carregarDados(){
+  try{
+    wallet=Number(localStorage.getItem('ci-w'))||0;
+    best=Number(localStorage.getItem('ci-best'))||0;
+  }catch(e){}
+}
+function salvarDados(){
+  try{
+    localStorage.setItem('ci-w',wallet);
+    localStorage.setItem('ci-best',best);
+  }catch(e){}
+}
+carregarDados();
 var CD=CAR.map(function(c){return shade(c,-60)});
 function shade(h,a){var n=parseInt(h.slice(1),16),f=function(v){return Math.max(0,Math.min(255,v+a))};
   return 'rgb('+f((n>>16)&255)+','+f((n>>8)&255)+','+f(n&255)+')'}
