@@ -25,11 +25,11 @@ canvas{width:100%;height:100%;display:block}
 #go{box-shadow:0 5px 0 #a8431c,0 10px 24px rgba(0,0,0,.4);transition:transform .08s}
 #go:active{transform:translateY(3px);box-shadow:0 2px 0 #a8431c}
 .rw{display:flex;gap:10px}
-#shopb,#back,.sk button{font:inherit;font-weight:700;border-radius:14px;cursor:pointer;color:var(--gold);background:transparent;border:2px solid var(--gold);padding:12px 26px;font-size:1.1rem}
+#shopb,#statsb,#back,#sback,.sk button{font:inherit;font-weight:700;border-radius:14px;cursor:pointer;color:var(--gold);background:transparent;border:2px solid var(--gold);padding:12px 26px;font-size:1.1rem}
 #bank{color:var(--gold);font-weight:700}
 #cr{opacity:.75;font-size:.85rem}
-#shop{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;gap:12px;padding:22px 16px;background:rgba(15,18,36,.96);overflow-y:auto;touch-action:pan-y}
-#shop h2{margin:0;font-size:1.8rem;color:var(--gold)}
+#shop,#stats{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;gap:12px;padding:22px 16px;background:rgba(15,18,36,.96);overflow-y:auto;touch-action:pan-y}
+#shop h2,#stats h2{margin:0;font-size:1.8rem;color:var(--gold)}
 #wal{font-weight:700}
 #grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;width:100%}
 .sk{background:#232846;border-radius:16px;padding:10px;text-align:center;border:2px solid transparent;display:flex;flex-direction:column;align-items:center;gap:6px}
@@ -49,6 +49,12 @@ canvas{width:100%;height:100%;display:block}
 @media (prefers-reduced-motion:reduce){#ov #go{animation:none}}
 #hint{opacity:.85;max-width:300px;text-align:center}
 #mute{position:absolute;right:12px;bottom:14px;z-index:5;width:44px;height:44px;padding:0;border-radius:50%;border:2px solid var(--gold);background:rgba(15,18,36,.6);color:var(--text);font-size:1.2rem;cursor:pointer}
+#shopb,#statsb{padding:12px 18px}
+#stats{z-index:6}
+#stats>*{flex-shrink:0}
+#lista{width:100%;display:flex;flex-direction:column;gap:8px}
+.st{display:flex;justify-content:space-between;gap:12px;background:#232846;border-radius:12px;padding:11px 14px}
+.st b{color:var(--gold);white-space:nowrap}
 </style>
 
 
@@ -62,7 +68,7 @@ canvas{width:100%;height:100%;display:block}
     <p id="d"></p>
     <div class="bot">
       <button id="go">Jogar</button>
-      <button id="shopb">Loja</button>
+      <div class="rw"><button id="shopb">Loja</button><button id="statsb">Estatísticas</button></div>
       <small id="hint">Deslize para os lados, para cima (pular) e para baixo (deslizar). No teclado, use as setas.</small>
       <small id="cr"></small>
     </div>
@@ -72,6 +78,11 @@ canvas{width:100%;height:100%;display:block}
     <div id="wal"></div>
     <div id="grid"></div>
     <button id="back">Voltar</button>
+  </div>
+  <div id="stats">
+    <h2>Estatísticas</h2>
+    <div id="lista"></div>
+    <button id="sback">Voltar</button>
   </div>
 </div>
 <script>
@@ -87,9 +98,9 @@ function P(l,t){var lw=2*hw(t)/3;return{x:W/2+(l-1)*lw,y:HZ+(H-HZ)*t,u:lw*0.75}}
 function rr(x,y,w,h,r){ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h)}
 
 var state='menu',best=0,objs,lane,px,jumpT,slideT,speed,score,coins,dist,spawnT,phase,runP,noCoin,pauseT,gotCoin;
-try{best=+localStorage.getItem('ci-best')||0}catch(e){}
 
-function reset(){objs=[];lane=1;px=1;jumpT=0;slideT=0;speed=0.75;score=0;coins=0;noCoin=0;pauseT=0;gotCoin=false;dist=0;spawnT=0.2;phase=0;runP=0}
+function reset(){objs=[];lane=1;px=1;jumpT=0;slideT=0;speed=0.75;score=0;coins=0;noCoin=0;pauseT=0;gotCoin=false;dist=0;spawnT=0.2;phase=0;runP=0;tempo=0;pulos=0;deslizes=0}
+var tempo,pulos,deslizes;
 reset();
 
 function spawn(){
@@ -106,6 +117,7 @@ function end(){
   state='over';SFX.crash();
   wallet+=coins;
   if(score>best)best=score;
+  registrarPartida();
   salvarDados();
   document.getElementById('t').textContent='Fim de jogo';
   var dd=document.getElementById('d');dd.style.display='block';dd.innerHTML='<b>Pontos</b> '+score+'<br><b>Moedas</b> '+coins+'<br><b>Tempo sem moedas</b> '+noCoin.toFixed(1)+' s<br><b>Recorde</b> '+best;
@@ -116,11 +128,11 @@ function act(a){
   if(state!=='play')return;
   if(a==='L'&&lane>0){lane--;SFX.lane()}
   if(a==='R'&&lane<2){lane++;SFX.lane()}
-  if(a==='U'&&jumpT===0){jumpT=0.001;slideT=0;SFX.jump()}
-  if(a==='D'){jumpT=0;slideT=0.6;SFX.slide()}
+  if(a==='U'&&jumpT===0){jumpT=0.001;slideT=0;pulos++;SFX.jump()}
+  if(a==='D'){if(slideT===0)deslizes++;jumpT=0;slideT=0.6;SFX.slide()}
 }
 document.getElementById('go').addEventListener('click',start);
-window.addEventListener('keydown',function(e){if(e.key==='Enter'&&state!=='play'&&ov.style.display!=='none')start()});
+window.addEventListener('keydown',function(e){if(e.key==='Enter'&&e.target.tagName!=='BUTTON'&&state!=='play'&&ov.style.display!=='none')start()});
 window.addEventListener('keydown',function(e){
   var m={ArrowLeft:'L',a:'L',ArrowRight:'R',d:'R',ArrowUp:'U',w:'U',' ':'U',ArrowDown:'D',s:'D'};
   if(m[e.key]){e.preventDefault();act(m[e.key])}
@@ -134,6 +146,7 @@ cv.addEventListener('touchend',function(e){
 },{passive:true});
 
 function update(dt){
+  tempo+=dt;
   speed=0.75+Math.min(score,1200)/1200*0.95;
   phase=(phase+speed*dt*0.5)%1;scrollZ+=speed*dt*0.5*10/14;runP+=dt*speed*9;if(!gotCoin)noCoin+=dt;
   dist+=dt*speed;score=Math.floor(dist*10)+coins*10;
@@ -164,20 +177,43 @@ var SK=[
 {id:3,n:'Ninja',p:150,a:'#3a3f58',b:'#1c1f30',h:'#e63946',k:'#d9a877',l:'#111'},
 {id:4,n:'Ouro',p:300,a:'#ffe066',b:'#e0a100',h:'#fff7e0',k:'#ffd7a8',l:'#7a5a00'}];
 var wallet=0,owned=[0],skin=0,CAR=['#e63946','#f4a300','#3a82f0','#2fbf71','#9b5de5'];
-try{wallet=+localStorage.getItem('ci-w')||0;owned=JSON.parse(localStorage.getItem('ci-o')||'[0]');skin=+localStorage.getItem('ci-s')||0}catch(e){}
-function save(){try{localStorage.setItem('ci-w',wallet);localStorage.setItem('ci-o',JSON.stringify(owned));localStorage.setItem('ci-s',skin)}catch(e){}}
-// ===== SALVAMENTO: moedas e recorde =====
+// ===== SALVAMENTO: moedas, recorde e estatísticas =====
+var est={moedas:0,partidas:0,pontos:0,semMoeda:0,maxMoedas:0,tempo:0,maiorTempo:0,pulos:0,deslizes:0};
 function carregarDados(){
   try{
     wallet=Number(localStorage.getItem('ci-w'))||0;
     best=Number(localStorage.getItem('ci-best'))||0;
+    skin=Number(localStorage.getItem('ci-s'))||0;
+    owned=JSON.parse(localStorage.getItem('ci-o'))||[0];
   }catch(e){}
+  var salvo=null;
+  try{salvo=JSON.parse(localStorage.getItem('ci-stats'))}catch(e){}
+  if(salvo){for(var k in est)est[k]=Number(salvo[k])||0}
+  // primeira vez: aproveita as moedas que você já tinha (guardadas + gastas)
+  else est.moedas=wallet+moedasGastas();
 }
 function salvarDados(){
   try{
     localStorage.setItem('ci-w',wallet);
     localStorage.setItem('ci-best',best);
+    localStorage.setItem('ci-o',JSON.stringify(owned));
+    localStorage.setItem('ci-s',skin);
+    localStorage.setItem('ci-stats',JSON.stringify(est));
   }catch(e){}
+}
+function moedasGastas(){
+  return SK.reduce(function(t,s){return t+(owned.indexOf(s.id)>=0?s.p:0)},0);
+}
+function registrarPartida(){
+  est.partidas++;
+  est.moedas+=coins;
+  est.pontos+=score;
+  est.semMoeda=Math.max(est.semMoeda,noCoin);
+  est.maxMoedas=Math.max(est.maxMoedas,coins);
+  est.tempo+=tempo;
+  est.maiorTempo=Math.max(est.maiorTempo,tempo);
+  est.pulos+=pulos;
+  est.deslizes+=deslizes;
 }
 carregarDados();
 var CD=CAR.map(function(c){return shade(c,-60)});
@@ -286,7 +322,7 @@ function buildShop(){
     var nm=document.createElement('div');nm.textContent=s.n;nm.className='nm';d.appendChild(nm);
     var b=document.createElement('button');b.textContent=has?(skin===s.id?'Equipado':'Equipar'):'Comprar · '+s.p;
     b.disabled=(has&&skin===s.id)||(!has&&wallet<s.p);
-    b.addEventListener('click',function(){if(!has){if(wallet<s.p)return;wallet-=s.p;owned.push(s.id);SFX.buy()}else SFX.click();skin=s.id;save();buildShop()});
+    b.addEventListener('click',function(){if(!has){if(wallet<s.p)return;wallet-=s.p;owned.push(s.id);SFX.buy()}else SFX.click();skin=s.id;salvarDados();buildShop()});
     d.appendChild(b);gd.appendChild(d);
     var old=ctx;ctx=cn.getContext('2d');
     var gr=ctx.createRadialGradient(80,120,5,80,120,80);gr.addColorStop(0,'rgba(255,255,255,.2)');gr.addColorStop(1,'rgba(255,255,255,0)');
@@ -297,6 +333,32 @@ var shopEl=document.getElementById('shop');
 document.getElementById('shopb').addEventListener('click',function(){ac();SFX.click();ov.style.display='none';shopEl.style.display='flex';buildShop()});
 document.getElementById('back').addEventListener('click',function(){shopEl.style.display='none';ov.style.display='flex';refreshMenu()});
 refreshMenu();
+// ===== ABA DE ESTATÍSTICAS =====
+var statsEl=document.getElementById('stats');
+function formatarTempo(t){
+  if(t<60)return t.toFixed(1)+' s';
+  var s=Math.floor(t),h=Math.floor(s/3600),m=Math.floor(s%3600/60);
+  return (h?h+' h ':'')+m+' min '+(s%60)+' s';
+}
+function montarEstatisticas(){
+  var linhas=[
+    ['Recorde de pontos',best],
+    ['Melhor tempo sem moedas',formatarTempo(est.semMoeda)],
+    ['Moedas coletadas no total',est.moedas],
+    ['Moedas guardadas',wallet],
+    ['Moedas gastas',moedasGastas()],
+    ['Mais moedas em uma partida',est.maxMoedas],
+    ['Partidas jogadas',est.partidas],
+    ['Média de pontos',est.partidas?Math.round(est.pontos/est.partidas):0],
+    ['Tempo total jogado',formatarTempo(est.tempo)],
+    ['Partida mais longa',formatarTempo(est.maiorTempo)],
+    ['Pulos',est.pulos],
+    ['Deslizes',est.deslizes],
+    ['Skins desbloqueadas',owned.length+' de '+SK.length]];
+  document.getElementById('lista').innerHTML=linhas.map(function(l){return '<div class="st"><span>'+l[0]+'</span><b>'+l[1]+'</b></div>'}).join('');
+}
+document.getElementById('statsb').addEventListener('click',function(){ac();SFX.click();montarEstatisticas();ov.style.display='none';statsEl.style.display='flex';statsEl.scrollTop=0});
+document.getElementById('sback').addEventListener('click',function(){SFX.click();statsEl.style.display='none';ov.style.display='flex'});
 var scrollZ=0,BC=['#3a3560','#33426b','#4d3558','#2f4f5a','#4a4238'];
 var BS=BC.map(function(c){return shade(c,-35)});
 function rnd(a,s){var x=Math.sin(a*127.1+s*311.7)*43758.5453;return x-Math.floor(x)}
